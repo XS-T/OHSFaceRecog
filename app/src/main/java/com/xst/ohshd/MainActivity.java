@@ -1,5 +1,6 @@
 package com.xst.ohshd;
 
+import android.annotation.SuppressLint;
 import android.hardware.Camera;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -15,11 +16,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.NoRouteToHostException;
 import java.net.URL;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.view.Surface;
+import android.content.pm.ActivityInfo;
 
 public class MainActivity extends AppCompatActivity {
     private CameraPreview cameraPreview;
@@ -27,10 +30,13 @@ public class MainActivity extends AppCompatActivity {
     private Camera camera;
     private int currentCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
 
+    @SuppressLint("SourceLockedOrientationActivity")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
         cameraPreview = findViewById(R.id.cameraPreview);
         resultTextView = findViewById(R.id.resultTextView);
@@ -39,7 +45,8 @@ public class MainActivity extends AppCompatActivity {
         captureButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                captureFrame();
+                captureFrame(captureButton);
+                captureButton.setVisibility(View.INVISIBLE);
             }
         });
 
@@ -72,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void captureFrame() {
+    private void captureFrame(Button captureButton) {
         cameraPreview.captureImage(new Camera.PictureCallback() {
             @Override
             public void onPictureTaken(byte[] data, Camera camera) {
@@ -104,8 +111,8 @@ public class MainActivity extends AppCompatActivity {
                 byte[] rotatedData = byteArrayOutputStream.toByteArray();
 
                 // Send the rotated image to the server
-                sendToServer(rotatedData);
-
+                sendToServer(rotatedData,captureButton);
+                resultTextView.setText("Sending to Server");
                 camera.startPreview(); // Restart preview after capturing
             }
         });
@@ -118,12 +125,13 @@ public class MainActivity extends AppCompatActivity {
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
     }
 
-    private void sendToServer(final byte[] imageData) {
+    private void sendToServer(final byte[] imageData, Button captureButton) {
         AsyncTask.execute(new Runnable() {
+            @SuppressLint("SetTextI18n")
             @Override
             public void run() {
                 try {
-                    URL url = new URL("http://10.1.1.34:5000/recognize");
+                    URL url = new URL("http://10.1.1.16:5000/recognize");
                     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                     connection.setRequestMethod("POST");
                     connection.setDoOutput(true);
@@ -132,10 +140,16 @@ public class MainActivity extends AppCompatActivity {
                     connection.setRequestProperty("Content-Type", "application/octet-stream");
 
                     // Write image data to the server
-                    OutputStream outputStream = connection.getOutputStream();
-                    outputStream.write(imageData);
-                    outputStream.flush();
-                    outputStream.close();
+                    try {
+                        OutputStream outputStream = connection.getOutputStream();
+                        outputStream.write(imageData);
+                        outputStream.flush();
+                        outputStream.close();
+                    } catch (NoRouteToHostException e) {
+                        // You should handle this exception appropriately, e.g., show a message to the user
+                        Log.e("FacialRecognition", "NoRouteToHostException: Server is not online");
+                        return;
+                    }
 
                     // Get the response from the server
                     int responseCode = connection.getResponseCode();
@@ -147,9 +161,11 @@ public class MainActivity extends AppCompatActivity {
 
                         // Update UI on the main thread
                         runOnUiThread(new Runnable() {
+                            @SuppressLint("SetTextI18n")
                             @Override
                             public void run() {
                                 resultTextView.setText("Server response: " + result);
+                                captureButton.setVisibility(View.VISIBLE);
                             }
                         });
                     } else {
