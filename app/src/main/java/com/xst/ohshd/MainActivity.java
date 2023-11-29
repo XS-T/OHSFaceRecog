@@ -195,11 +195,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendToServer(final byte[] imageData, Button captureButton, Button uploadButton) {
-        new ServerTask("http://10.1.1.16:5000/recognize", imageData, captureButton, uploadButton, whore_sound).execute();
+        new ServerTask("http://ohshd.aris-net.com/recognize", imageData, captureButton, uploadButton, whore_sound).execute();
     }
 
     private void uploadToServer(final byte[] imageData, Button captureButton, Button uploadButton) {
-        new ServerTask("http://10.1.1.16:5000/upload", imageData, captureButton, uploadButton, whore_sound).execute();
+        new ServerTask("http://ohshd.aris-net.com/upload", imageData, captureButton, uploadButton, whore_sound).execute();
     }
 
     private String readStream(InputStream inputStream) throws IOException {
